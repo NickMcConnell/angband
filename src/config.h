@@ -100,7 +100,7 @@
 #define SCORE_BORGS
 
 /* Allow the borg to run as xscreensaver */
-#define XSCREENSAVER 
+/*#define XSCREENSAVER */
 
 
 /*
