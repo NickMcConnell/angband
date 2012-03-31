@@ -449,6 +449,10 @@ int main(int argc, char *argv[])
 	/* Set up the display handlers and things. */
 	init_display();
 
+#ifdef XSCREENSAVER
+	start_screensaver();
+#endif
+
 	/* Play the game */
 	play_game();
 

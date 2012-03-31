@@ -46,6 +46,7 @@ bool arg_graphics_nice;			/* Command arg -- Request nice graphics mode */
 
 #ifdef ALLOW_BORG
 bool screensaver = FALSE;
+bool auto_start_borg = FALSE;
 #endif /* ALLOW_BORG */
 
 /*

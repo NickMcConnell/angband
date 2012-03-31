@@ -1417,6 +1417,10 @@ static void dungeon(struct cave *c)
 	if (p_ptr->energy < INITIAL_DUNGEON_ENERGY)
 		p_ptr->energy = INITIAL_DUNGEON_ENERGY;
 
+#ifdef XSCREENSAVER
+	if (auto_start_borg) do_cmd_borg();
+#endif
+
 
 	/*** Process this dungeon level ***/
 

@@ -108,7 +108,15 @@
 #include <X11/keysym.h>
 #include <X11/keysymdef.h>
 
+
 #include "main.h"
+
+#ifdef XSCREENSAVER
+#include <signal.h>
+#include "vroot.h"
+#include "cmds.h"
+#include "files.h"
+#endif
 
 #ifndef IsModifierKey
 
@@ -1986,12 +1994,170 @@ static errr Term_xtra_x11_react(void)
 	return (0);
 }
 
+#ifdef XSCREENSAVER
+
+#ifdef ALLOW_BORG
+
+/*
+ * Hook into the inkey() function so that flushing keypresses
+ * doesn't affect us.
+ *
+ * ToDo: Try to implement recording and playing back of games
+ * by saving/reading the keypresses to/from a file. Note that
+ * interrupting certain actions (resting, running, and other
+ * repeated actions) would mess that up, so this would have to
+ * be switched off when recording.
+ */
+
+extern struct keypress (*inkey_hack)(int flush_first);
+
+static struct keypress screensaver_inkey_hack_buffer[1024];
+
+static struct keypress screensaver_inkey_hack(int flush_first)
+{
+	static size_t screensaver_inkey_hack_index = 0;
+
+	if (screensaver_inkey_hack_index < sizeof(screensaver_inkey_hack_buffer))
+		return (screensaver_inkey_hack_buffer[screensaver_inkey_hack_index++]);
+	else
+	{
+		struct keypress key = {EVT_KBRD, ESCAPE, 0};
+		return key;
+	}
+}
+
+#endif /* ALLOW_BORG */
+
+
+/*
+ * Start the screensaver
+ */
+extern void start_screensaver(void)
+{
+	bool file_exist;
+
+#ifdef ALLOW_BORG
+	int i, j;
+	struct keypress key = {EVT_KBRD, 0, 0};
+#endif /* ALLOW_BORG */
+
+	/* Set 'savefile' to a valid name */
+	process_player_name(TRUE);
+
+	/* Does the savefile already exist? */
+	file_exist = file_exists(savefile);
+
+	/* Don't try to load a non-existant savefile */
+	if (!file_exist)
+	{
+	        savefile[0] = '\0';
+#ifdef ALLOW_BORG
+		key.code = '*';
+	}
+	else
+	        key.code = ESCAPE;
+#endif
+
+
+	Term_fresh();
+
+#ifdef ALLOW_BORG
+	/*
+	 * MegaHack - Try to start the Borg.
+	 *
+	 * The simulated keypresses will be processed when play_game()
+	 * is called.
+	 */
+
+	inkey_hack = screensaver_inkey_hack;
+	j = 0;
+
+	/*
+	 * If no savefile is present or then go through the steps necessary
+	 * to create a random character.  If a savefile already is present
+	 * then the simulated keypresses will either clean away any [-more-]
+	 * prompts (if the character is alive), or create a new random
+	 * character.
+	 *
+	 * Luckily it's possible to send the same keypresses no matter if
+	 * the character is alive, dead, or not even yet created.
+	 */
+	screensaver_inkey_hack_buffer[j++] = key; /* Gender */
+	screensaver_inkey_hack_buffer[j++] = key; /* Race */
+	screensaver_inkey_hack_buffer[j++] = key; /* Class */
+	key.code = 'n';
+	screensaver_inkey_hack_buffer[j++] = key; /* Modify options */
+	key.code = '\r';
+	screensaver_inkey_hack_buffer[j++] = key; /* Reroll */
+	key.code = '\r';
+	screensaver_inkey_hack_buffer[j++] = key; /* Return */
+	key.code = ESCAPE;
+	screensaver_inkey_hack_buffer[j++] = key; /* Character info */
+
+	/*
+	 * Make sure the "verify_special" options is off, so that we can
+	 * get into Borg mode without confirmation.
+	 *
+	 * Try just marking the savefile correctly.
+	 */
+	p_ptr->noscore |= (NOSCORE_BORG);
+
+	/*
+	 * Make sure the "OPT(cheat_live)" option is set, so that the Borg can
+	 * automatically restart.
+	 */
+	key.code = '5';
+	screensaver_inkey_hack_buffer[j++] = key; /* Cheat options */
+
+	/* Cursor down to "cheat live" */
+	key.code = '2';
+	for (i = 0; i < OPT_cheat_live - OPT_CHEAT - 1; i++)
+		screensaver_inkey_hack_buffer[j++] = key;
+
+	key.code = 'y';
+	screensaver_inkey_hack_buffer[j++] = key; /* Switch on "OPT(cheat_live)" */
+	key.code = ESCAPE;
+	screensaver_inkey_hack_buffer[j++] = key; /* Leave cheat options */
+	screensaver_inkey_hack_buffer[j++] = key; /* Leave options */
+
+	/*
+	 * Now start the Borg!
+	 */
+
+	key.code = KTRL('Z');
+	screensaver_inkey_hack_buffer[j++] = key; /* Enter borgmode */
+	key.code = 'z';
+	screensaver_inkey_hack_buffer[j++] = key; /* Run Borg */
+#endif /* ALLOW_BORG */
+}
+
+#endif /* XSCREENSAVER */
+
+
+
+static int exit_now = 0;
+void shutdown_xscreensaver(int x)
+{
+        exit_now = 1;
+}
+
 
 /*
  * Handle a "special request"
  */
 static errr Term_xtra_x11(int n, int v)
 {
+#ifdef XSCREENSAVER
+        static int first_time = 1;
+
+	if (exit_now)
+	{
+                exit_now = 0;
+		do_cmd_save_game(FALSE, 0);
+		exit(0);
+	}
+#endif
+
 	/* Handle a subset of the legal requests */
 	switch (n)
 	{
@@ -2005,7 +2171,18 @@ static errr Term_xtra_x11(int n, int v)
 		case TERM_XTRA_BORED: return (CheckEvent(0));
 
 		/* Process Events XXX */
-		case TERM_XTRA_EVENT: return (CheckEvent(v));
+		case TERM_XTRA_EVENT:
+
+#ifdef XSCREENSAVER
+		        if (first_time)
+			{
+
+			        first_time = 0;
+				signal(SIGTERM, shutdown_xscreensaver);
+				return 0;
+			}
+ #endif
+			return (CheckEvent(v));
 
 		/* Flush the events XXX */
 		case TERM_XTRA_FLUSH: while (!CheckEvent(FALSE)); return (0);

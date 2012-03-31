@@ -20,6 +20,10 @@
 #ifdef ALLOW_BORG
 /* Screensaver variables for the borg.  apw */
 extern bool screensaver;
+extern bool auto_start_borg;
+#ifdef XSCREENSAVER
+extern void start_screensaver(void);
+#endif /* XSCREENSAVER */
 #endif /* ALLOW_BORG */
 
 /* tables.c */

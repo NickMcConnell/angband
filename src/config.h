@@ -99,6 +99,9 @@
 /* Allow borgs to yield "high scores"? */
 #define SCORE_BORGS
 
+/* Allow the borg to run as xscreensaver */
+#define XSCREENSAVER 
+
 
 /*
  * Allow the Borg to use graphics.

@@ -3119,6 +3119,9 @@ bool init_angband(void)
 	cmd_init();
 
 #ifdef ALLOW_BORG /* apw */
+#ifdef XSCREENSAVER
+	screensaver = TRUE;
+#endif
 	/* Allow the screensaver to do its work  */
 	if (screensaver)
 	{
